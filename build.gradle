@@ -85,3 +85,9 @@ tasks.register('verifyFixtures') {
 tasks.named('check') {
     dependsOn tasks.named('verifyFixtures')
 }
+
+tasks.register('runFxShell') {
+    group = 'application'
+    description = 'Runs the JavaFX shell migration app.'
+    dependsOn ':ui-javafx:run'
+}
