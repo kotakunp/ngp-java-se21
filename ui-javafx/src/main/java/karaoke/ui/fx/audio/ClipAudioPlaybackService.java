@@ -113,6 +113,19 @@ public class ClipAudioPlaybackService implements AudioPlaybackService {
     }
 
     @Override
+    public void seekToTimelineUnit(long timelineUnit) {
+        if (clip == null || !loaded.get()) {
+            status.set("Load audio before seeking");
+            return;
+        }
+        long clampedTimelineUnit = Math.max(0L, Math.min(durationTimelineUnits.get(), timelineUnit));
+        clip.setFramePosition((int) (clampedTimelineUnit * 1000L));
+        long micros = clip.getMicrosecondPosition();
+        positionMicros.set(micros);
+        status.set("Seeked to " + clampedTimelineUnit);
+    }
+
+    @Override
     public void togglePlayback() {
         if (clip == null || !loaded.get()) {
             status.set("Load audio before playing");

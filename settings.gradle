@@ -1,3 +1,4 @@
 rootProject.name = 'ngp-karaoke'
 
+include('legacy-swing')
 include('ui-javafx')

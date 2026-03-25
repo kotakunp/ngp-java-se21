@@ -24,13 +24,17 @@ public class FxShellState {
     private final StringProperty busyStatus = new SimpleStringProperty("Idle");
     private final StringProperty durationStatus = new SimpleStringProperty("0:00");
     private final StringProperty positionStatus = new SimpleStringProperty("0:00");
+    private final StringProperty previewCurrentLine = new SimpleStringProperty("Import text or open a project to render the current karaoke line.");
+    private final StringProperty previewNextLine = new SimpleStringProperty("The next lyric line will appear here.");
     private final LongProperty durationMicros = new SimpleLongProperty(0L);
     private final LongProperty positionMicros = new SimpleLongProperty(0L);
     private final IntegerProperty wordCount = new SimpleIntegerProperty(0);
     private final IntegerProperty lineCount = new SimpleIntegerProperty(0);
     private final IntegerProperty paintIndex = new SimpleIntegerProperty(0);
     private final IntegerProperty selectedWordIndex = new SimpleIntegerProperty(-1);
+    private final IntegerProperty activeWordIndex = new SimpleIntegerProperty(-1);
     private final BooleanProperty paintMode = new SimpleBooleanProperty(false);
+    private final BooleanProperty endLineAdjustMode = new SimpleBooleanProperty(false);
     private final BooleanProperty playing = new SimpleBooleanProperty(false);
     private final BooleanProperty loading = new SimpleBooleanProperty(false);
     private final ObservableList<String> lyricLines = FXCollections.observableArrayList();
@@ -76,6 +80,14 @@ public class FxShellState {
         return positionStatus;
     }
 
+    public StringProperty previewCurrentLineProperty() {
+        return previewCurrentLine;
+    }
+
+    public StringProperty previewNextLineProperty() {
+        return previewNextLine;
+    }
+
     public LongProperty durationMicrosProperty() {
         return durationMicros;
     }
@@ -100,8 +112,16 @@ public class FxShellState {
         return selectedWordIndex;
     }
 
+    public IntegerProperty activeWordIndexProperty() {
+        return activeWordIndex;
+    }
+
     public BooleanProperty paintModeProperty() {
         return paintMode;
+    }
+
+    public BooleanProperty endLineAdjustModeProperty() {
+        return endLineAdjustMode;
     }
 
     public BooleanProperty playingProperty() {

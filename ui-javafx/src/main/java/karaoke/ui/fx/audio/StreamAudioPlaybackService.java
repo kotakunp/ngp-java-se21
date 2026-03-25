@@ -131,6 +131,28 @@ public class StreamAudioPlaybackService implements AudioPlaybackService {
     }
 
     @Override
+    public void seekToTimelineUnit(long timelineUnit) {
+        if (!loaded.get() || playbackFormat == null) {
+            status.set("Load audio before seeking");
+            return;
+        }
+
+        long clampedTimelineUnit = Math.max(0L, Math.min(durationTimelineUnits.get(), timelineUnit));
+        long targetFrames = clampedTimelineUnit * TimelineMath.AUDIO_FRAMES_PER_TIMELINE_UNIT;
+        boolean resumePlayback = playing.get();
+        stopInternal(false);
+        resumeFrames = Math.max(0L, Math.min(totalFrames, targetFrames));
+        playbackBaseMicros = framesToMicros(resumeFrames, playbackFormat);
+        Platform.runLater(() -> {
+            positionMicros.set(playbackBaseMicros);
+            status.set("Seeked to " + clampedTimelineUnit);
+        });
+        if (resumePlayback) {
+            startPlaybackThread();
+        }
+    }
+
+    @Override
     public void togglePlayback() {
         if (!loaded.get() || audioFile == null || playbackFormat == null) {
             status.set("Load audio before playing");

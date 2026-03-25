@@ -24,6 +24,8 @@ public interface AudioPlaybackService {
 
     void load(File audioFile);
 
+    void seekToTimelineUnit(long timelineUnit);
+
     void togglePlayback();
 
     void stop();

@@ -1,7 +1,6 @@
 package karaoke.ui.fx.view;
 
 import karaoke.ui.fx.app.FxShellState;
-import javafx.beans.binding.Bindings;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
 import javafx.scene.layout.StackPane;
@@ -27,14 +26,21 @@ public class PreviewPane extends StackPane {
         title.setTextFill(Color.web(FxTheme.TEXT_PRIMARY));
         title.setFont(Font.font("Arial", 26));
 
-        Label description = new Label();
-        description.textProperty().bind(Bindings.when(state.paintModeProperty())
-            .then("Paint mode active. Connect word progress and line highlighting.")
-            .otherwise("Word progress and line paint will render here"));
-        description.setTextFill(Color.web(FxTheme.TEXT_MUTED));
-        description.setFont(Font.font("Arial", 14));
+        Label currentLine = new Label();
+        currentLine.textProperty().bind(state.previewCurrentLineProperty());
+        currentLine.setWrapText(true);
+        currentLine.setTextFill(Color.web(FxTheme.TEXT_PRIMARY));
+        currentLine.setFont(Font.font("Arial", 24));
+        currentLine.setAlignment(Pos.CENTER);
 
-        content.getChildren().addAll(title, description);
+        Label nextLine = new Label();
+        nextLine.textProperty().bind(state.previewNextLineProperty());
+        nextLine.setWrapText(true);
+        nextLine.setTextFill(Color.web(FxTheme.TEXT_MUTED));
+        nextLine.setFont(Font.font("Arial", 18));
+        nextLine.setAlignment(Pos.CENTER);
+
+        content.getChildren().addAll(title, currentLine, nextLine);
         getChildren().add(content);
     }
 }

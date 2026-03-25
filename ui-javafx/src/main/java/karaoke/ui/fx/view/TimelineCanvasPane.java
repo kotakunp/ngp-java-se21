@@ -42,6 +42,7 @@ public class TimelineCanvasPane extends StackPane {
         state.playingProperty().addListener(redraw);
         state.paintIndexProperty().addListener(redraw);
         state.selectedWordIndexProperty().addListener(redraw);
+        state.activeWordIndexProperty().addListener(redraw);
         state.durationMicrosProperty().addListener(redraw);
         state.positionMicrosProperty().addListener(redraw);
         state.getTimelineMarkers().addListener((javafx.collections.ListChangeListener<TimelineWordMarker>) change -> draw());
@@ -127,7 +128,9 @@ public class TimelineCanvasPane extends StackPane {
             double y = topPadding + (marker.getLineIndex() * laneHeight);
 
             Color fill = marker.isPainted() ? Color.web("#3da46a", 0.8) : Color.web("#2e6ea8", 0.7);
-            if (marker.getWordIndex() == state.paintIndexProperty().get()) {
+            if (marker.getWordIndex() == state.activeWordIndexProperty().get()) {
+                fill = Color.web("#f04e98", 0.95);
+            } else if (marker.getWordIndex() == state.paintIndexProperty().get()) {
                 fill = Color.web("#ffb347", 0.9);
             } else if (marker.getWordIndex() == state.selectedWordIndexProperty().get()) {
                 fill = Color.web("#5bc0eb", 0.9);
@@ -168,7 +171,7 @@ public class TimelineCanvasPane extends StackPane {
             double y = topPadding + (marker.getLineIndex() * laneHeight);
             double markerHeight = Math.max(18, laneHeight - 10);
             if (mouseX >= x && mouseX <= x + markerWidth && mouseY >= y && mouseY <= y + markerHeight) {
-                viewModel.selectWord(marker.getWordIndex());
+                viewModel.seekToWord(marker.getWordIndex());
                 return;
             }
         }

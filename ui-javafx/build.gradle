@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'com.ngp.karaoke'
-version = '0.1.0'
+version = '1.0.0'
 
 java {
     toolchain {
@@ -18,7 +18,7 @@ repositories {
 }
 
 dependencies {
-    implementation project(':')
+    implementation project(':legacy-swing')
 }
 
 javafx {
@@ -41,6 +41,39 @@ jar {
             'Main-Class': application.mainClass.get()
         )
     }
+}
+
+tasks.register('fatJar', Jar) {
+    group = 'build'
+    description = 'Builds an executable fat jar for the JavaFX migration app.'
+    dependsOn tasks.named('jar')
+    archiveBaseName = 'karaoke-creator-fx'
+    archiveClassifier = 'all'
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    manifest {
+        attributes(
+            'Main-Class': application.mainClass.get()
+        )
+    }
+
+    from(sourceSets.main.output)
+    from {
+        configurations.runtimeClasspath.collect { dependency ->
+            dependency.isDirectory() ? dependency : zipTree(dependency)
+        }
+    }
+
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+}
+
+tasks.register('copyFatJarToRoot', Copy) {
+    group = 'distribution'
+    description = 'Copies the JavaFX executable fat jar to the project root.'
+    dependsOn tasks.named('fatJar')
+    from(tasks.named('fatJar'))
+    into(rootProject.projectDir)
+    rename { 'Karaoke creator FX.jar' }
 }
 
 def jpackageInputDir = layout.buildDirectory.dir('jpackage/input')
@@ -75,7 +108,10 @@ tasks.register('packageFxAppImage', Exec) {
             '--app-version', project.version.toString(),
             '--vendor', providers.gradleProperty('appVendor').get(),
             '--main-jar', tasks.named('jar').get().archiveFile.get().asFile.name,
-            '--main-class', application.mainClass.get()
+            '--main-class', application.mainClass.get(),
+            '--java-options', '--module-path',
+            '--java-options', '$APPDIR',
+            '--java-options', '--add-modules=javafx.base,javafx.graphics,javafx.controls'
         )
     }
 }
@@ -99,7 +135,10 @@ tasks.register('packageFxNative', Exec) {
             '--app-version', project.version.toString(),
             '--vendor', providers.gradleProperty('appVendor').get(),
             '--main-jar', tasks.named('jar').get().archiveFile.get().asFile.name,
-            '--main-class', application.mainClass.get()
+            '--main-class', application.mainClass.get(),
+            '--java-options', '--module-path',
+            '--java-options', '$APPDIR',
+            '--java-options', '--add-modules=javafx.base,javafx.graphics,javafx.controls'
         )
     }
 }

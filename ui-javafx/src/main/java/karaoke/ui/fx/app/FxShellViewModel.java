@@ -1,6 +1,7 @@
 package karaoke.ui.fx.app;
 
 import java.io.File;
+import java.util.List;
 
 import javafx.concurrent.Service;
 import javafx.stage.FileChooser;
@@ -8,6 +9,8 @@ import javafx.stage.Window;
 import karaoke.app.main.service.PaintWorkflowService;
 import karaoke.app.main.service.ProjectSession;
 import karaoke.app.main.service.SelectionNavigationService;
+import karaoke.shared.Location;
+import karaoke.shared.wordLine;
 import karaoke.ui.fx.audio.AudioPlaybackService;
 import karaoke.ui.fx.audio.StreamAudioPlaybackService;
 
@@ -211,6 +214,7 @@ public class FxShellViewModel {
             ? "Paint mode armed at word " + state.paintIndexProperty().get()
             : "Paint mode idle");
         state.nextStepStatusProperty().set("Use the selected word as the paint anchor, then bind mark/end-line commands to playback time.");
+        updatePreviewLines();
     }
 
     public void markCurrentWord() {
@@ -279,6 +283,16 @@ public class FxShellViewModel {
         projectSession.setSelectedLineIndex(currentProject.getWords().get(wordIndex).getLine_idx());
         state.selectedWordIndexProperty().set(wordIndex);
         state.selectionStatusProperty().set("Selected word " + wordIndex + ": " + currentProject.getWords().get(wordIndex).getWord());
+        updatePreviewLines();
+    }
+
+    public void seekToWord(int wordIndex) {
+        if (currentProject == null || wordIndex < 0 || wordIndex >= currentProject.getMarkers().size()) {
+            return;
+        }
+        selectWord(wordIndex);
+        audioPlaybackService.seekToTimelineUnit(currentProject.getMarkers().get(wordIndex).getStart());
+        state.nextStepStatusProperty().set("Playback seeked to the selected word.");
     }
 
     public void selectPreviousWord() {
@@ -297,6 +311,57 @@ public class FxShellViewModel {
         if (selectionNavigationService.moveSelectionRight(projectSession, currentProject.getWords().size())) {
             selectWord(projectSession.getSelectedWordIndex());
         }
+    }
+
+    public void setEndLineAdjustMode(boolean enabled) {
+        state.endLineAdjustModeProperty().set(enabled);
+        if (enabled) {
+            state.nextStepStatusProperty().set("End-line adjust mode active.");
+        }
+    }
+
+    public void nudgeSelectedWord(boolean earlier) {
+        if (currentProject == null || projectSession.getSelectedWordIndex() < 0
+            || projectSession.getSelectedWordIndex() >= currentProject.getWords().size()) {
+            return;
+        }
+
+        List<wordLine> words = currentProject.getWords();
+        int selectedIndex = projectSession.getSelectedWordIndex();
+        wordLine currentWord = words.get(selectedIndex);
+        int sec = state.endLineAdjustModeProperty().get() ? currentWord.getLow_sec() : currentWord.getSec();
+        sec += earlier ? -1 : 1;
+
+        wordLine beforeWord = selectedIndex > 0 ? words.get(selectedIndex - 1) : null;
+        wordLine afterWord = selectedIndex < words.size() - 1 ? words.get(selectedIndex + 1) : null;
+
+        if (state.endLineAdjustModeProperty().get()) {
+            currentWord.moveLineEnd(sec);
+            if (afterWord != null) {
+                afterWord.setHigh_sec(sec);
+            }
+        } else {
+            currentWord.moveLine(sec);
+            if (currentWord.getLocation() == Location.start) {
+                if (afterWord != null) {
+                    afterWord.setHigh_sec(sec);
+                }
+            } else if (currentWord.getLocation() == Location.middle) {
+                if (beforeWord != null) {
+                    beforeWord.setLow_sec(sec);
+                }
+                if (afterWord != null) {
+                    afterWord.setHigh_sec(sec);
+                }
+            } else if (currentWord.getLocation() == Location.end && beforeWord != null && beforeWord.getLocation() != Location.end) {
+                beforeWord.setLow_sec(sec);
+            }
+        }
+
+        audioPlaybackService.seekToTimelineUnit(sec);
+        refreshCurrentProject();
+        state.selectionStatusProperty().set("Adjusted word " + selectedIndex + (earlier ? " earlier" : " later"));
+        state.nextStepStatusProperty().set("Use up/down to keep refining the selected word timing.");
     }
 
     private void bindWorkerState(Service<?> service) {
@@ -332,6 +397,7 @@ public class FxShellViewModel {
         audioPlaybackService.positionMicrosProperty().addListener((obs, oldValue, newValue) -> {
             state.positionMicrosProperty().set(newValue.longValue());
             state.positionStatusProperty().set(formatMicros(newValue.longValue()));
+            updateActiveWordFromPlayback();
         });
     }
 
@@ -345,6 +411,8 @@ public class FxShellViewModel {
         projectSession.setPaintIndex(project.getPaintIndex());
         state.paintIndexProperty().set(projectSession.getPaintIndex());
         selectWord(project.getPaintIndex());
+        updateActiveWordFromPlayback();
+        updatePreviewLines();
     }
 
     private void refreshCurrentProject() {
@@ -357,6 +425,76 @@ public class FxShellViewModel {
         state.paintIndexProperty().set(projectSession.getPaintIndex());
         state.wordCountProperty().set(currentProject.getWordCount());
         state.lineCountProperty().set(currentProject.getLineCount());
+        updateActiveWordFromPlayback();
+        updatePreviewLines();
+    }
+
+    private void updatePreviewLines() {
+        if (currentProject == null || currentProject.getWords().isEmpty()) {
+            state.previewCurrentLineProperty().set("Import text or open a project to render the current karaoke line.");
+            state.previewNextLineProperty().set("The next lyric line will appear here.");
+            return;
+        }
+
+        int anchorIndex = resolvePreviewAnchorIndex();
+
+        int currentLineIndex = currentProject.getWords().get(anchorIndex).getLine_idx();
+        state.previewCurrentLineProperty().set(renderPreviewLine(currentLineIndex, anchorIndex));
+        state.previewNextLineProperty().set(renderPreviewLine(currentLineIndex + 1, -1));
+    }
+
+    private int resolvePreviewAnchorIndex() {
+        if (state.activeWordIndexProperty().get() >= 0) {
+            return Math.max(0, Math.min(state.activeWordIndexProperty().get(), currentProject.getWords().size() - 1));
+        }
+        if (state.paintModeProperty().get()) {
+            return Math.max(0, Math.min(state.paintIndexProperty().get(), currentProject.getWords().size() - 1));
+        }
+        return Math.max(0, Math.min(state.selectedWordIndexProperty().get(), currentProject.getWords().size() - 1));
+    }
+
+    private String renderPreviewLine(int lineIndex, int highlightWordIndex) {
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < currentProject.getWords().size(); i++) {
+            if (currentProject.getWords().get(i).getLine_idx() != lineIndex) {
+                continue;
+            }
+            if (builder.length() > 0) {
+                builder.append(' ');
+            }
+            if (i == highlightWordIndex) {
+                builder.append('[').append(currentProject.getWords().get(i).getWord()).append(']');
+            } else {
+                builder.append(currentProject.getWords().get(i).getWord());
+            }
+        }
+        return builder.length() == 0 ? " " : builder.toString();
+    }
+
+    private void updateActiveWordFromPlayback() {
+        if (currentProject == null || currentProject.getMarkers().isEmpty()) {
+            state.activeWordIndexProperty().set(-1);
+            return;
+        }
+
+        long durationMicros = state.durationMicrosProperty().get();
+        long durationTimelineUnits = audioPlaybackService.durationTimelineUnitsProperty().get();
+        if (durationMicros <= 0L || durationTimelineUnits <= 0L) {
+            state.activeWordIndexProperty().set(-1);
+            return;
+        }
+
+        long timelineUnit = (state.positionMicrosProperty().get() * durationTimelineUnits) / durationMicros;
+        int activeWordIndex = -1;
+        for (int i = 0; i < currentProject.getMarkers().size(); i++) {
+            if (timelineUnit >= currentProject.getMarkers().get(i).getStart()
+                && timelineUnit <= currentProject.getMarkers().get(i).getEnd()) {
+                activeWordIndex = currentProject.getMarkers().get(i).getWordIndex();
+                break;
+            }
+        }
+        state.activeWordIndexProperty().set(activeWordIndex);
+        updatePreviewLines();
     }
 
     private String formatMicros(long micros) {

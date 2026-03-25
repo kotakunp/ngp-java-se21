@@ -28,6 +28,7 @@ public class InspectorPane extends VBox {
             infoRow("Position", state.positionStatusProperty()),
             infoRow("Duration", state.durationStatusProperty()),
             infoRow("Selected", state.selectedWordIndexProperty().asString()),
+            infoRow("End Adjust", Bindings.when(state.endLineAdjustModeProperty()).then("On").otherwise("Off")),
             infoRow("Paint", Bindings.when(state.paintModeProperty()).then("Armed").otherwise("Idle")),
             infoRow("Paint Index", state.paintIndexProperty().asString()),
             infoRow("Words", state.wordCountProperty().asString()),
