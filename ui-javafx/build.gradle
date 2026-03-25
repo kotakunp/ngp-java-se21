@@ -76,6 +76,10 @@ tasks.register('copyFatJarToRoot', Copy) {
     rename { 'Karaoke creator FX.jar' }
 }
 
+tasks.named('copyFatJarToRoot') {
+    mustRunAfter tasks.named('prepareJpackageInput')
+}
+
 def jpackageInputDir = layout.buildDirectory.dir('jpackage/input')
 def jpackageOutputDir = layout.buildDirectory.dir('jpackage/output')
 

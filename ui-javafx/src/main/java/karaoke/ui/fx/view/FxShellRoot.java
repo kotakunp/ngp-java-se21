@@ -33,14 +33,17 @@ public class FxShellRoot extends BorderPane {
     private VBox buildEditorPane(FxShellState state, FxShellViewModel viewModel) {
         VBox editorPane = new VBox(14);
         editorPane.setPadding(new Insets(16));
+        editorPane.setFillWidth(true);
 
         Label title = sectionTitle("Timeline Editor");
         TimelineCanvasPane timelinePane = new TimelineCanvasPane(state, viewModel);
         timelinePane.setMinHeight(420);
+        timelinePane.setPrefHeight(420);
+        timelinePane.setMaxHeight(420);
 
         Label subtitle = sectionTitle("Lyrics Editor");
         LyricsEditorPane lyricsEditor = new LyricsEditorPane(state);
-        VBox.setVgrow(timelinePane, Priority.ALWAYS);
+        VBox.setVgrow(timelinePane, Priority.NEVER);
         VBox.setVgrow(lyricsEditor, Priority.ALWAYS);
 
         editorPane.getChildren().addAll(title, timelinePane, subtitle, lyricsEditor);
@@ -50,6 +53,7 @@ public class FxShellRoot extends BorderPane {
     private VBox buildSidebar(FxShellState state) {
         VBox sidebar = new VBox(14);
         sidebar.setPadding(new Insets(16, 16, 16, 0));
+        sidebar.setFillWidth(true);
         sidebar.getChildren().addAll(
             sectionTitle("Preview"),
             new PreviewPane(state),

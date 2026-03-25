@@ -24,6 +24,7 @@ public class TimelineCanvasPane extends StackPane {
         this.state = state;
         this.viewModel = viewModel;
         getChildren().add(canvas);
+        canvas.setManaged(false);
         setPadding(new Insets(8));
         setStyle("-fx-background-color: " + FxTheme.CANVAS_BACKGROUND + ";"
             + "-fx-border-color: " + FxTheme.BORDER + ";"
@@ -31,10 +32,9 @@ public class TimelineCanvasPane extends StackPane {
             + "-fx-background-radius: 12;"
             + "-fx-border-radius: 12;");
 
-        canvas.widthProperty().bind(widthProperty().subtract(16));
-        canvas.heightProperty().bind(heightProperty().subtract(16));
-
         ChangeListener<Object> redraw = (obs, oldVal, newVal) -> draw();
+        widthProperty().addListener((obs, oldVal, newVal) -> resizeCanvas());
+        heightProperty().addListener((obs, oldVal, newVal) -> resizeCanvas());
         canvas.widthProperty().addListener(redraw);
         canvas.heightProperty().addListener(redraw);
         state.timelineStatusProperty().addListener(redraw);
@@ -47,7 +47,22 @@ public class TimelineCanvasPane extends StackPane {
         state.positionMicrosProperty().addListener(redraw);
         state.getTimelineMarkers().addListener((javafx.collections.ListChangeListener<TimelineWordMarker>) change -> draw());
         canvas.setOnMouseClicked(event -> handleSelection(event.getX(), event.getY()));
+        resizeCanvas();
         draw();
+    }
+
+    @Override
+    protected void layoutChildren() {
+        super.layoutChildren();
+        resizeCanvas();
+    }
+
+    private void resizeCanvas() {
+        double availableWidth = Math.max(1, getWidth() - snappedLeftInset() - snappedRightInset());
+        double availableHeight = Math.max(1, getHeight() - snappedTopInset() - snappedBottomInset());
+        canvas.setWidth(availableWidth);
+        canvas.setHeight(availableHeight);
+        canvas.relocate(snappedLeftInset(), snappedTopInset());
     }
 
     private void draw() {

@@ -10,6 +10,7 @@ public class LyricsEditorPane extends VBox {
     public LyricsEditorPane(FxShellState state) {
         ListView<String> lyricsList = new ListView<String>();
         lyricsList.setItems(state.getLyricLines());
+        lyricsList.setPlaceholder(new javafx.scene.control.Label("Import text or open a project to show lyrics."));
         getChildren().add(lyricsList);
         VBox.setVgrow(lyricsList, Priority.ALWAYS);
     }
