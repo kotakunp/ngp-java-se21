@@ -1,0 +1,87 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'com.ngp.karaoke'
+version = '0.1.0'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src']
+        }
+        resources {
+            srcDirs = ['src', 'image']
+            exclude '**/*.java', '**/.DS_Store'
+        }
+    }
+}
+
+application {
+    mainClass = 'karaoke.app.main.KaraokeCreatorLast'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.withType(ProcessResources).configureEach {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+jar {
+    archiveBaseName = 'karaoke-creator'
+    manifest {
+        attributes(
+            'Main-Class': application.mainClass.get()
+        )
+    }
+}
+
+def verifierClasses = [
+    'karaoke.shared.io.NgpIoFixtureVerifier',
+    'karaoke.shared.timing.TimelineMathVerifier',
+    'karaoke.shared.edit.EditServicesVerifier',
+    'karaoke.shared.repair.ProjectRepairVerifier',
+    'karaoke.app.main.service.ProjectSessionServiceVerifier',
+    'karaoke.app.main.service.PaintWorkflowServiceVerifier',
+    'karaoke.app.main.service.SelectionNavigationServiceVerifier'
+]
+
+verifierClasses.each { verifierClass ->
+    def taskName = "verify${verifierClass.tokenize('.').last()}"
+    tasks.register(taskName, JavaExec) {
+        group = 'verification'
+        description = "Runs ${verifierClass}."
+        classpath = sourceSets.main.runtimeClasspath
+        mainClass = verifierClass
+        if (verifierClass.contains('shared.io') || verifierClass.contains('shared.edit') ||
+            verifierClass.contains('shared.repair') || verifierClass.contains('PaintWorkflow') ||
+            verifierClass.contains('SelectionNavigation')) {
+            jvmArgs '-Djava.awt.headless=true'
+        }
+    }
+}
+
+tasks.register('verifyFixtures') {
+    group = 'verification'
+    description = 'Runs the current regression verifier suite.'
+    dependsOn verifierClasses.collect { verifierClass ->
+        "verify${verifierClass.tokenize('.').last()}"
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('verifyFixtures')
+}
