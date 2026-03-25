@@ -39,7 +39,7 @@ public class FxShellRoot extends BorderPane {
         timelinePane.setMinHeight(420);
 
         Label subtitle = sectionTitle("Lyrics Editor");
-        LyricsEditorPane lyricsEditor = new LyricsEditorPane();
+        LyricsEditorPane lyricsEditor = new LyricsEditorPane(state);
         VBox.setVgrow(timelinePane, Priority.ALWAYS);
         VBox.setVgrow(lyricsEditor, Priority.ALWAYS);
 

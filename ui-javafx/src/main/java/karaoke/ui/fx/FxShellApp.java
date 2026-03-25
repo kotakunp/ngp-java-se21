@@ -11,6 +11,7 @@ public class FxShellApp extends Application {
     @Override
     public void start(Stage stage) {
         FxShellViewModel viewModel = new FxShellViewModel();
+        viewModel.setOwnerWindow(stage);
         FxShellRoot root = new FxShellRoot(viewModel);
 
         Scene scene = new Scene(root, 1480, 920);

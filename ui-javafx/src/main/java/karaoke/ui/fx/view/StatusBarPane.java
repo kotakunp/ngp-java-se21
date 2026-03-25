@@ -13,7 +13,7 @@ public class StatusBarPane extends BorderPane {
     public StatusBarPane(FxShellState state) {
         setPadding(new Insets(10, 16, 12, 16));
         setStyle("-fx-background-color: #0b0f14; -fx-border-color: " + FxTheme.MUTED_BORDER + " transparent transparent transparent;");
-        setLeft(statusLabel(Bindings.concat("Shell: ", state.shellStatusProperty())));
+        setLeft(statusLabel(Bindings.concat("Shell: ", state.shellStatusProperty(), "  |  Busy: ", state.busyStatusProperty())));
         setRight(statusLabel(Bindings.concat("Next: ", state.nextStepStatusProperty())));
     }
 

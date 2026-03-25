@@ -1,6 +1,7 @@
 package karaoke.ui.fx.view;
 
 import karaoke.ui.fx.app.FxShellState;
+import karaoke.ui.fx.timeline.TimelineWordMarker;
 import javafx.beans.value.ChangeListener;
 import javafx.geometry.Insets;
 import javafx.scene.canvas.Canvas;
@@ -36,6 +37,8 @@ public class TimelineCanvasPane extends StackPane {
         state.timelineStatusProperty().addListener(redraw);
         state.paintModeProperty().addListener(redraw);
         state.playingProperty().addListener(redraw);
+        state.paintIndexProperty().addListener(redraw);
+        state.getTimelineMarkers().addListener((javafx.collections.ListChangeListener<TimelineWordMarker>) change -> draw());
         draw();
     }
 
@@ -74,6 +77,8 @@ public class TimelineCanvasPane extends StackPane {
         double cursorX = state.playingProperty().get() ? width * 0.35 : width * 0.2;
         gc.strokeLine(cursorX, 0, cursorX, height);
 
+        drawTimelineMarkers(gc, width, height);
+
         if (state.paintModeProperty().get()) {
             gc.setFill(Color.web("#2f6f54", 0.25));
             gc.fillRect(0, 0, width, height);
@@ -82,5 +87,42 @@ public class TimelineCanvasPane extends StackPane {
         gc.setFill(Color.web(FxTheme.TEXT_PRIMARY));
         gc.setFont(Font.font("Arial", 13));
         gc.fillText(state.timelineStatusProperty().get(), 18, 28);
+    }
+
+    private void drawTimelineMarkers(GraphicsContext gc, double width, double height) {
+        if (state.getTimelineMarkers().isEmpty()) {
+            return;
+        }
+
+        int maxEnd = 1;
+        int maxLine = 0;
+        for (TimelineWordMarker marker : state.getTimelineMarkers()) {
+            maxEnd = Math.max(maxEnd, marker.getEnd());
+            maxLine = Math.max(maxLine, marker.getLineIndex());
+        }
+
+        double leftPadding = 24;
+        double topPadding = 48;
+        double timelineWidth = width - (leftPadding * 2);
+        double laneHeight = Math.max(28, (height - topPadding - 18) / Math.max(1, maxLine + 1));
+
+        for (TimelineWordMarker marker : state.getTimelineMarkers()) {
+            double x = leftPadding + ((double) marker.getStart() / maxEnd) * timelineWidth;
+            double endX = leftPadding + ((double) marker.getEnd() / maxEnd) * timelineWidth;
+            double markerWidth = Math.max(18, endX - x);
+            double y = topPadding + (marker.getLineIndex() * laneHeight);
+
+            Color fill = marker.isPainted() ? Color.web("#3da46a", 0.8) : Color.web("#2e6ea8", 0.7);
+            if (marker.getWordIndex() == state.paintIndexProperty().get()) {
+                fill = Color.web("#ffb347", 0.9);
+            }
+
+            gc.setFill(fill);
+            gc.fillRoundRect(x, y, markerWidth, Math.max(18, laneHeight - 10), 8, 8);
+
+            gc.setFill(Color.web(FxTheme.TEXT_PRIMARY));
+            gc.setFont(Font.font("Arial", 11));
+            gc.fillText(marker.getText(), x + 6, y + Math.min(16, laneHeight / 2 + 6));
+        }
     }
 }
