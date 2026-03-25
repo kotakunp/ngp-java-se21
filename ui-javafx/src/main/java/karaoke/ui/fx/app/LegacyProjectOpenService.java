@@ -5,7 +5,7 @@ import java.io.File;
 import javafx.concurrent.Service;
 import javafx.concurrent.Task;
 
-public class LegacyProjectOpenService extends Service<LegacyProjectFacade.OpenedProject> {
+public class LegacyProjectOpenService extends Service<LegacyProjectFacade.EditorProjectSnapshot> {
 
     private final LegacyProjectFacade legacyProjectFacade;
     private File projectFile;
@@ -24,11 +24,11 @@ public class LegacyProjectOpenService extends Service<LegacyProjectFacade.Opened
     }
 
     @Override
-    protected Task<LegacyProjectFacade.OpenedProject> createTask() {
+    protected Task<LegacyProjectFacade.EditorProjectSnapshot> createTask() {
         final File selectedFile = projectFile;
-        return new Task<LegacyProjectFacade.OpenedProject>() {
+        return new Task<LegacyProjectFacade.EditorProjectSnapshot>() {
             @Override
-            protected LegacyProjectFacade.OpenedProject call() throws Exception {
+            protected LegacyProjectFacade.EditorProjectSnapshot call() throws Exception {
                 if (selectedFile == null) {
                     throw new IllegalStateException("No project file selected.");
                 }

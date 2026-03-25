@@ -17,25 +17,25 @@ public class FxShellRoot extends BorderPane {
         FxShellState state = viewModel.getState();
 
         setTop(new ToolbarPane(viewModel));
-        setCenter(buildWorkspace(state));
+        setCenter(buildWorkspace(state, viewModel));
         setBottom(new StatusBarPane(state));
         setStyle("-fx-background-color: " + FxTheme.APP_BACKGROUND + ";");
     }
 
-    private SplitPane buildWorkspace(FxShellState state) {
+    private SplitPane buildWorkspace(FxShellState state, FxShellViewModel viewModel) {
         SplitPane horizontal = new SplitPane();
         horizontal.setDividerPositions(0.7);
-        horizontal.getItems().addAll(buildEditorPane(state), buildSidebar(state));
+        horizontal.getItems().addAll(buildEditorPane(state, viewModel), buildSidebar(state));
         horizontal.setStyle("-fx-background-color: " + FxTheme.APP_BACKGROUND + ";");
         return horizontal;
     }
 
-    private VBox buildEditorPane(FxShellState state) {
+    private VBox buildEditorPane(FxShellState state, FxShellViewModel viewModel) {
         VBox editorPane = new VBox(14);
         editorPane.setPadding(new Insets(16));
 
         Label title = sectionTitle("Timeline Editor");
-        TimelineCanvasPane timelinePane = new TimelineCanvasPane(state);
+        TimelineCanvasPane timelinePane = new TimelineCanvasPane(state, viewModel);
         timelinePane.setMinHeight(420);
 
         Label subtitle = sectionTitle("Lyrics Editor");

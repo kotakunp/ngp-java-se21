@@ -20,6 +20,13 @@ public class ToolbarPane extends ToolBar {
             new Separator(Orientation.VERTICAL),
             actionButton("Play", viewModel::togglePlayback),
             actionButton("Paint", viewModel::togglePaintMode),
+            actionButton("Mark Word", viewModel::markCurrentWord),
+            actionButton("End Line", viewModel::markLineEnd),
+            actionButton("Undo Paint", viewModel::undoLastPaint),
+            new Separator(Orientation.VERTICAL),
+            actionButton("Prev Word", viewModel::selectPreviousWord),
+            actionButton("Next Word", viewModel::selectNextWord),
+            new Separator(Orientation.VERTICAL),
             actionButton("Zoom In", viewModel::zoomIn),
             actionButton("Zoom Out", viewModel::zoomOut)
         );

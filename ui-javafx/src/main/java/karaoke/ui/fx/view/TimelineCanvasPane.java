@@ -1,7 +1,5 @@
 package karaoke.ui.fx.view;
 
-import karaoke.ui.fx.app.FxShellState;
-import karaoke.ui.fx.timeline.TimelineWordMarker;
 import javafx.beans.value.ChangeListener;
 import javafx.geometry.Insets;
 import javafx.scene.canvas.Canvas;
@@ -9,6 +7,9 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
+import karaoke.ui.fx.app.FxShellState;
+import karaoke.ui.fx.app.FxShellViewModel;
+import karaoke.ui.fx.timeline.TimelineWordMarker;
 
 public class TimelineCanvasPane extends StackPane {
 
@@ -17,9 +18,11 @@ public class TimelineCanvasPane extends StackPane {
 
     private final Canvas canvas = new Canvas(DEFAULT_WIDTH, DEFAULT_HEIGHT);
     private final FxShellState state;
+    private final FxShellViewModel viewModel;
 
-    public TimelineCanvasPane(FxShellState state) {
+    public TimelineCanvasPane(FxShellState state, FxShellViewModel viewModel) {
         this.state = state;
+        this.viewModel = viewModel;
         getChildren().add(canvas);
         setPadding(new Insets(8));
         setStyle("-fx-background-color: " + FxTheme.CANVAS_BACKGROUND + ";"
@@ -38,7 +41,11 @@ public class TimelineCanvasPane extends StackPane {
         state.paintModeProperty().addListener(redraw);
         state.playingProperty().addListener(redraw);
         state.paintIndexProperty().addListener(redraw);
+        state.selectedWordIndexProperty().addListener(redraw);
+        state.durationMicrosProperty().addListener(redraw);
+        state.positionMicrosProperty().addListener(redraw);
         state.getTimelineMarkers().addListener((javafx.collections.ListChangeListener<TimelineWordMarker>) change -> draw());
+        canvas.setOnMouseClicked(event -> handleSelection(event.getX(), event.getY()));
         draw();
     }
 
@@ -74,7 +81,14 @@ public class TimelineCanvasPane extends StackPane {
 
         gc.setStroke(Color.web(FxTheme.CURSOR));
         gc.setLineWidth(2.5);
-        double cursorX = state.playingProperty().get() ? width * 0.35 : width * 0.2;
+        double cursorX = width * 0.2;
+        long durationMicros = state.durationMicrosProperty().get();
+        if (durationMicros > 0L) {
+            double ratio = Math.min(1D, Math.max(0D, (double) state.positionMicrosProperty().get() / durationMicros));
+            cursorX = 24 + ((width - 48) * ratio);
+        } else if (state.playingProperty().get()) {
+            cursorX = width * 0.35;
+        }
         gc.strokeLine(cursorX, 0, cursorX, height);
 
         drawTimelineMarkers(gc, width, height);
@@ -115,6 +129,8 @@ public class TimelineCanvasPane extends StackPane {
             Color fill = marker.isPainted() ? Color.web("#3da46a", 0.8) : Color.web("#2e6ea8", 0.7);
             if (marker.getWordIndex() == state.paintIndexProperty().get()) {
                 fill = Color.web("#ffb347", 0.9);
+            } else if (marker.getWordIndex() == state.selectedWordIndexProperty().get()) {
+                fill = Color.web("#5bc0eb", 0.9);
             }
 
             gc.setFill(fill);
@@ -123,6 +139,38 @@ public class TimelineCanvasPane extends StackPane {
             gc.setFill(Color.web(FxTheme.TEXT_PRIMARY));
             gc.setFont(Font.font("Arial", 11));
             gc.fillText(marker.getText(), x + 6, y + Math.min(16, laneHeight / 2 + 6));
+        }
+    }
+
+    private void handleSelection(double mouseX, double mouseY) {
+        if (state.getTimelineMarkers().isEmpty()) {
+            return;
+        }
+
+        int maxEnd = 1;
+        int maxLine = 0;
+        for (TimelineWordMarker marker : state.getTimelineMarkers()) {
+            maxEnd = Math.max(maxEnd, marker.getEnd());
+            maxLine = Math.max(maxLine, marker.getLineIndex());
+        }
+
+        double width = Math.max(1, canvas.getWidth());
+        double height = Math.max(1, canvas.getHeight());
+        double leftPadding = 24;
+        double topPadding = 48;
+        double timelineWidth = width - (leftPadding * 2);
+        double laneHeight = Math.max(28, (height - topPadding - 18) / Math.max(1, maxLine + 1));
+
+        for (TimelineWordMarker marker : state.getTimelineMarkers()) {
+            double x = leftPadding + ((double) marker.getStart() / maxEnd) * timelineWidth;
+            double endX = leftPadding + ((double) marker.getEnd() / maxEnd) * timelineWidth;
+            double markerWidth = Math.max(18, endX - x);
+            double y = topPadding + (marker.getLineIndex() * laneHeight);
+            double markerHeight = Math.max(18, laneHeight - 10);
+            if (mouseX >= x && mouseX <= x + markerWidth && mouseY >= y && mouseY <= y + markerHeight) {
+                viewModel.selectWord(marker.getWordIndex());
+                return;
+            }
         }
     }
 }

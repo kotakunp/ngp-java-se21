@@ -5,7 +5,7 @@ import java.io.File;
 import javafx.concurrent.Service;
 import javafx.concurrent.Task;
 
-public class LegacyLyricsImportService extends Service<LegacyProjectFacade.ImportedLyrics> {
+public class LegacyLyricsImportService extends Service<LegacyProjectFacade.EditorProjectSnapshot> {
 
     private final LegacyProjectFacade legacyProjectFacade;
     private File textFile;
@@ -24,11 +24,11 @@ public class LegacyLyricsImportService extends Service<LegacyProjectFacade.Impor
     }
 
     @Override
-    protected Task<LegacyProjectFacade.ImportedLyrics> createTask() {
+    protected Task<LegacyProjectFacade.EditorProjectSnapshot> createTask() {
         final File selectedFile = textFile;
-        return new Task<LegacyProjectFacade.ImportedLyrics>() {
+        return new Task<LegacyProjectFacade.EditorProjectSnapshot>() {
             @Override
-            protected LegacyProjectFacade.ImportedLyrics call() throws Exception {
+            protected LegacyProjectFacade.EditorProjectSnapshot call() throws Exception {
                 if (selectedFile == null) {
                     throw new IllegalStateException("No text file selected.");
                 }

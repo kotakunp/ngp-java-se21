@@ -33,3 +33,73 @@ application {
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
+
+jar {
+    archiveBaseName = 'karaoke-creator-fx'
+    manifest {
+        attributes(
+            'Main-Class': application.mainClass.get()
+        )
+    }
+}
+
+def jpackageInputDir = layout.buildDirectory.dir('jpackage/input')
+def jpackageOutputDir = layout.buildDirectory.dir('jpackage/output')
+
+tasks.register('prepareJpackageInput', Sync) {
+    group = 'distribution'
+    description = 'Stages the JavaFX app jars and runtime classpath for jpackage.'
+    dependsOn tasks.named('jar')
+    into(jpackageInputDir)
+    from(tasks.named('jar'))
+    from(configurations.runtimeClasspath)
+}
+
+tasks.register('packageFxAppImage', Exec) {
+    group = 'distribution'
+    description = 'Builds a self-contained JavaFX app image with jpackage.'
+    dependsOn tasks.named('prepareJpackageInput')
+
+    def inputDir = jpackageInputDir.get().asFile
+    def outputDir = jpackageOutputDir.get().asFile
+    outputs.dir(outputDir)
+
+    doFirst {
+        outputDir.mkdirs()
+        commandLine(
+            'jpackage',
+            '--type', 'app-image',
+            '--input', inputDir.absolutePath,
+            '--dest', outputDir.absolutePath,
+            '--name', providers.gradleProperty('appName').get(),
+            '--app-version', project.version.toString(),
+            '--vendor', providers.gradleProperty('appVendor').get(),
+            '--main-jar', tasks.named('jar').get().archiveFile.get().asFile.name,
+            '--main-class', application.mainClass.get()
+        )
+    }
+}
+
+tasks.register('packageFxNative', Exec) {
+    group = 'distribution'
+    description = 'Builds a platform-native JavaFX installer with jpackage defaults.'
+    dependsOn tasks.named('prepareJpackageInput')
+
+    def inputDir = jpackageInputDir.get().asFile
+    def outputDir = jpackageOutputDir.get().asFile
+    outputs.dir(outputDir)
+
+    doFirst {
+        outputDir.mkdirs()
+        commandLine(
+            'jpackage',
+            '--input', inputDir.absolutePath,
+            '--dest', outputDir.absolutePath,
+            '--name', providers.gradleProperty('appName').get(),
+            '--app-version', project.version.toString(),
+            '--vendor', providers.gradleProperty('appVendor').get(),
+            '--main-jar', tasks.named('jar').get().archiveFile.get().asFile.name,
+            '--main-class', application.mainClass.get()
+        )
+    }
+}

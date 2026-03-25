@@ -1,13 +1,19 @@
 package karaoke.ui.fx.app;
 
+import java.awt.Color;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 import karaoke.app.main.service.LyricImportService;
+import karaoke.app.main.service.ProjectSaveService;
+import karaoke.shared.Location;
+import karaoke.shared.myTextfield;
+import karaoke.shared.io.Ng1ExportWriter;
 import karaoke.shared.io.NgpProjectData;
 import karaoke.shared.io.NgpProjectReader;
+import karaoke.shared.io.NgpProjectWriter;
 import karaoke.shared.wordLine;
 import karaoke.ui.fx.timeline.TimelineWordMarker;
 
@@ -15,107 +21,161 @@ public class LegacyProjectFacade {
 
     private final LyricImportService lyricImportService = new LyricImportService();
     private final NgpProjectReader projectReader = new NgpProjectReader();
+    private final ProjectSaveService projectSaveService = new ProjectSaveService(new NgpProjectWriter(), new Ng1ExportWriter());
 
-    public ImportedLyrics importText(File textFile) throws IOException {
+    public EditorProjectSnapshot importText(File textFile) throws IOException {
         List<List<String>> lines = lyricImportService.readTextFile(textFile);
-        List<String> renderedLines = new ArrayList<String>();
-        List<TimelineWordMarker> markers = new ArrayList<TimelineWordMarker>();
-        int wordCount = 0;
-        int timelineCursor = 0;
-        for (List<String> line : lines) {
-            renderedLines.add(String.join(" ", line));
-            for (int i = 0; i < line.size(); i++) {
-                String word = line.get(i);
-                int duration = Math.max(18, word.length() * 10);
-                markers.add(new TimelineWordMarker(word, renderedLines.size() - 1, wordCount + i, timelineCursor, timelineCursor + duration, false));
-                timelineCursor += duration + 8;
-            }
-            wordCount += line.size();
-            timelineCursor += 24;
-        }
-        return new ImportedLyrics(renderedLines, markers, wordCount, lines.size());
+        return createSnapshot(createImportedWords(lines), 0, "", null, textFile);
     }
 
-    public OpenedProject openProject(File projectFile) throws IOException {
+    public EditorProjectSnapshot openProject(File projectFile) throws IOException {
         NgpProjectData projectData = projectReader.read(projectFile);
+        return createSnapshot(projectData.getWords(), projectData.getPaintIndex(), projectData.getSongInfo(), projectFile, null);
+    }
+
+    public void saveProject(File projectFile, EditorProjectSnapshot snapshot, int durationTimelineUnits) throws IOException {
+        projectSaveService.saveProject(projectFile, lyricFileFor(projectFile), snapshot.getWords(), durationTimelineUnits, snapshot.getSongInfo());
+    }
+
+    public void exportProject(File exportFile, EditorProjectSnapshot snapshot) throws IOException {
+        projectSaveService.saveNg1(exportFile, snapshot.getWords());
+    }
+
+    public EditorProjectSnapshot withProjectFile(EditorProjectSnapshot snapshot, File projectFile) {
+        return new EditorProjectSnapshot(
+            snapshot.getLines(),
+            snapshot.getMarkers(),
+            snapshot.getWords(),
+            snapshot.getWordCount(),
+            snapshot.getLineCount(),
+            snapshot.getPaintIndex(),
+            snapshot.getSongInfo(),
+            projectFile,
+            snapshot.getImportedTextFile()
+        );
+    }
+
+    public EditorProjectSnapshot refreshSnapshot(EditorProjectSnapshot snapshot, int paintIndex) {
+        return createSnapshot(snapshot.getWords(), paintIndex, snapshot.getSongInfo(), snapshot.getProjectFile(), snapshot.getImportedTextFile());
+    }
+
+    private File lyricFileFor(File projectFile) {
+        String fileName = projectFile.getName();
+        int dotIndex = fileName.lastIndexOf('.');
+        String baseName = dotIndex > 0 ? fileName.substring(0, dotIndex) : fileName;
+        return new File(projectFile.getParentFile(), baseName + "-.txt");
+    }
+
+    private EditorProjectSnapshot createSnapshot(List<wordLine> words, int paintIndex, String songInfo, File projectFile, File importedTextFile) {
         List<String> renderedLines = new ArrayList<String>();
         List<TimelineWordMarker> markers = new ArrayList<TimelineWordMarker>();
-        List<wordLine> words = projectData.getWords();
         int currentLine = -1;
-        StringBuilder builder = new StringBuilder();
+        int timelineCursor = 0;
+        StringBuilder lineBuilder = new StringBuilder();
+
         for (wordLine word : words) {
             if (currentLine != word.getLine_idx()) {
-                if (builder.length() > 0) {
-                    renderedLines.add(builder.toString().trim());
-                    builder.setLength(0);
+                if (lineBuilder.length() > 0) {
+                    renderedLines.add(lineBuilder.toString().trim());
+                    lineBuilder.setLength(0);
                 }
                 currentLine = word.getLine_idx();
             }
-            builder.append(word.getWord()).append(' ');
-            markers.add(new TimelineWordMarker(
-                word.getWord(),
-                word.getLine_idx(),
-                word.getIdx(),
-                word.getSec(),
-                Math.max(word.getLow_sec(), word.getSec() + 1),
-                word.isPaint()
-            ));
+
+            lineBuilder.append(word.getWord()).append(' ');
+            int start = word.isPaint() ? word.getSec() : timelineCursor;
+            int end = word.isPaint() ? Math.max(word.getLow_sec(), word.getSec() + 1) : start + Math.max(18, word.getWord().length() * 10);
+            markers.add(new TimelineWordMarker(word.getWord(), word.getLine_idx(), word.getIdx(), start, end, word.isPaint()));
+            timelineCursor = end + 8;
         }
-        if (builder.length() > 0) {
-            renderedLines.add(builder.toString().trim());
+
+        if (lineBuilder.length() > 0) {
+            renderedLines.add(lineBuilder.toString().trim());
         }
-        return new OpenedProject(renderedLines, markers, words.size(), renderedLines.size(), projectData.getPaintIndex(), projectData.getSongInfo());
+
+        return new EditorProjectSnapshot(
+            renderedLines,
+            markers,
+            words,
+            words.size(),
+            renderedLines.size(),
+            paintIndex,
+            songInfo == null ? "" : songInfo,
+            projectFile,
+            importedTextFile
+        );
     }
 
-    public static final class ImportedLyrics {
-        private final List<String> lines;
-        private final List<TimelineWordMarker> markers;
-        private final int wordCount;
-        private final int lineCount;
-
-        public ImportedLyrics(List<String> lines, List<TimelineWordMarker> markers, int wordCount, int lineCount) {
-            this.lines = lines;
-            this.markers = markers;
-            this.wordCount = wordCount;
-            this.lineCount = lineCount;
+    private List<wordLine> createImportedWords(List<List<String>> lines) {
+        List<wordLine> words = new ArrayList<wordLine>();
+        int wordIndex = 0;
+        for (int lineIndex = 0; lineIndex < lines.size(); lineIndex++) {
+            List<String> line = lines.get(lineIndex);
+            for (int tokenIndex = 0; tokenIndex < line.size(); tokenIndex++) {
+                String text = line.get(tokenIndex);
+                wordLine word = new wordLine(text, new myTextfield(text, wordIndex, lineIndex, Color.lightGray), wordIndex);
+                word.setLine_idx(lineIndex);
+                word.setLocation(locationFor(line, tokenIndex));
+                words.add(word);
+                wordIndex++;
+            }
         }
-
-        public List<String> getLines() {
-            return lines;
-        }
-
-        public int getWordCount() {
-            return wordCount;
-        }
-
-        public int getLineCount() {
-            return lineCount;
-        }
-
-        public List<TimelineWordMarker> getMarkers() {
-            return markers;
-        }
+        return words;
     }
 
-    public static final class OpenedProject {
+    private Location locationFor(List<String> line, int tokenIndex) {
+        if (line.size() == 1 || tokenIndex == line.size() - 1) {
+            return Location.end;
+        }
+        if (tokenIndex == 0) {
+            return Location.start;
+        }
+        return Location.middle;
+    }
+
+    public static final class EditorProjectSnapshot {
         private final List<String> lines;
         private final List<TimelineWordMarker> markers;
+        private final List<wordLine> words;
         private final int wordCount;
         private final int lineCount;
         private final int paintIndex;
         private final String songInfo;
+        private final File projectFile;
+        private final File importedTextFile;
 
-        public OpenedProject(List<String> lines, List<TimelineWordMarker> markers, int wordCount, int lineCount, int paintIndex, String songInfo) {
+        public EditorProjectSnapshot(
+            List<String> lines,
+            List<TimelineWordMarker> markers,
+            List<wordLine> words,
+            int wordCount,
+            int lineCount,
+            int paintIndex,
+            String songInfo,
+            File projectFile,
+            File importedTextFile)
+        {
             this.lines = lines;
             this.markers = markers;
+            this.words = words;
             this.wordCount = wordCount;
             this.lineCount = lineCount;
             this.paintIndex = paintIndex;
             this.songInfo = songInfo;
+            this.projectFile = projectFile;
+            this.importedTextFile = importedTextFile;
         }
 
         public List<String> getLines() {
             return lines;
+        }
+
+        public List<TimelineWordMarker> getMarkers() {
+            return markers;
+        }
+
+        public List<wordLine> getWords() {
+            return words;
         }
 
         public int getWordCount() {
@@ -124,10 +184,6 @@ public class LegacyProjectFacade {
 
         public int getLineCount() {
             return lineCount;
-        }
-
-        public List<TimelineWordMarker> getMarkers() {
-            return markers;
         }
 
         public int getPaintIndex() {
@@ -136,6 +192,14 @@ public class LegacyProjectFacade {
 
         public String getSongInfo() {
             return songInfo;
+        }
+
+        public File getProjectFile() {
+            return projectFile;
+        }
+
+        public File getImportedTextFile() {
+            return importedTextFile;
         }
     }
 }
